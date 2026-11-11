@@ -102,6 +102,67 @@ GitHub Pages 是纯静态托管，没有后端，**不要指望把服务端私�
 - OneTag 的 Key 本来就是面向静态网页设计的公开 Key，可以直接用于纯前端页面；免费额度仍然可能被他人消耗，公开上线前请评估。
 - 如果你要做一个所有访客共用额度的公开工具，并且使用通义千问、豆包、Gemini 等私有 Key，请增加一个后端代理（Cloudflare Workers、Netlify Functions、Vercel Functions 等），前端只调用你的代理，不直接接触真实 Key。
 
+## 广告位配置
+
+页面预留了 3 个响应式广告位：
+
+- `top`：AI 设置下方、工具列表上方
+- `inFeed`：前 3 个工具卡片之后
+- `bottom`：工具列表下方、页脚上方
+
+配置集中在 `index.html` 的 `AD_CONFIG`，搜索 `===== 广告位配置 =====` 即可找到。默认显示“广告位预览”，不会加载任何广告脚本。
+
+### 接入 Google AdSense
+
+1. 在 AdSense 后台添加站点并通过审核。
+2. 创建广告单元，拿到 `ca-pub-...` 和每个广告位的 `data-ad-slot` ID。
+3. 修改 `AD_CONFIG`：
+
+```js
+const AD_CONFIG = {
+    enabled: true,
+    provider: 'adsense',
+    showPlaceholders: false,
+    adsense: {
+        client: 'ca-pub-1234567890123456',
+        slots: {
+            top: '1111111111',
+            inFeed: '2222222222',
+            bottom: '3333333333'
+        }
+    },
+    customHtml: { top: '', inFeed: '', bottom: '' },
+    labels: {
+        top: '顶部横幅广告位 · 970 × 90',
+        inFeed: '内容中插广告位 · 自适应',
+        bottom: '页底横幅广告位 · 970 × 90'
+    }
+};
+```
+
+页面会在有可用槽位时按需加载 `adsbygoogle.js`，没配置的广告位继续显示预览框或自动隐藏。
+
+### 接入百度联盟或其他广告
+
+把 `provider` 改成 `'custom'`，将广告代码粘贴到对应位置的 `customHtml`：
+
+```js
+provider: 'custom',
+customHtml: {
+    top: '<你的百度联盟广告代码>',
+    inFeed: '',
+    bottom: ''
+}
+```
+
+自定义 HTML 里的 `<script>` 会被重新创建并执行，因此可以兼容常见的联盟广告代码。正式上线前请确认广告平台允许你的域名、页面内容和展示方式。
+
+### 广告合规
+
+- 不要诱导点击广告，也不要给广告位加遮挡或自动点击逻辑。
+- 如果使用 Google AdSense，建议补充隐私政策页面，并按平台要求配置 `ads.txt`。
+- GitHub Pages 默认域名可以用于测试，正式商业化建议绑定自己的域名。
+
 ## 常见问题
 
 **打开 GitHub Pages 是 404**

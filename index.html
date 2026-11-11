@@ -359,6 +359,81 @@
             opacity: 0.8;
             font-size: 0.9rem;
         }
+
+        .ad-slot {
+            min-height: 100px;
+            margin-bottom: 24px;
+            border: 1px dashed rgba(255, 255, 255, 0.42);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .ad-slot[hidden] {
+            display: none;
+        }
+
+        .ad-slot.is-live {
+            min-height: 0;
+            border: 1px solid #e2e8f0;
+            background: white;
+        }
+
+        .ad-slot.is-live .adsbygoogle {
+            display: block;
+            width: 100%;
+        }
+
+        .ad-slot-label {
+            padding: 6px 12px;
+            background: #f7fafc;
+            color: #a0aec0;
+            font-size: 11px;
+            line-height: 1;
+            text-align: right;
+        }
+
+        .ad-placeholder {
+            min-height: 100px;
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            color: rgba(255, 255, 255, 0.88);
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .ad-placeholder-tag {
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.18);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .ad-placeholder-note {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12px;
+        }
+
+        .ad-slot-in-feed {
+            grid-column: 1 / -1;
+            margin-bottom: 0;
+        }
+
+        @media (max-width: 600px) {
+            .ad-slot,
+            .ad-placeholder {
+                min-height: 80px;
+            }
+
+            .ad-placeholder {
+                padding: 14px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -412,6 +487,8 @@
                 <div class="settings-message" id="ai-settings-message"></div>
             </div>
         </details>
+
+        <div class="ad-slot" id="ad-top" data-ad-position="top" aria-label="广告"></div>
 
         <div class="tools-grid">
             <!-- 1. 长文摘要 -->
@@ -474,6 +551,8 @@
                 <button class="action-btn" onclick="runTool('rewrite', this)">开始改写</button>
                 <div class="result-area" id="rewrite-result"></div>
             </div>
+
+            <div class="ad-slot ad-slot-in-feed" id="ad-in-feed" data-ad-position="inFeed" aria-label="广告"></div>
 
             <!-- 4. JSON结构化抽取 -->
             <div class="tool-card">
@@ -568,6 +647,8 @@
             </div>
         </div>
 
+        <div class="ad-slot" id="ad-bottom" data-ad-position="bottom" aria-label="广告"></div>
+
         <div class="footer">
             <p>纯HTML单文件 · 无需后端 · 直接部署到GitHub Pages即可上线</p>
         </div>
@@ -586,6 +667,150 @@
             faq: (input) => `请根据下面的产品/服务介绍，生成5个用户最可能问的常见问题及对应的详细解答，格式清晰：\n\n${input}`,
             proofread: (input) => `请仔细检查下面这段文案中的错别字、语法错误、标点错误和不通顺的地方，列出错误位置和修改建议，然后给出修正后的完整版本：\n\n${input}`
         };
+
+        // ===== 广告位配置 =====
+        // 三个位置：top（顶部横幅）、inFeed（卡片流中插）、bottom（页底横幅）。
+        // 方式一：填 AdSense 的 client 和槽位 ID，页面会自动加载官方广告脚本。
+        // 方式二：provider 改成 'custom'，把百度联盟/其他广告代码粘贴到 customHtml。
+        const AD_CONFIG = {
+            enabled: true,
+            provider: 'adsense', // 'adsense' 或 'custom'
+            showPlaceholders: true, // 还没配置广告时显示虚线预览框；正式上线可改为 false
+            adsense: {
+                client: '', // 例如 'ca-pub-1234567890123456'
+                slots: {
+                    top: '', // 例如 '1234567890'
+                    inFeed: '',
+                    bottom: ''
+                }
+            },
+            customHtml: {
+                top: '',
+                inFeed: '',
+                bottom: ''
+            },
+            labels: {
+                top: '顶部横幅广告位 · 970 × 90',
+                inFeed: '内容中插广告位 · 自适应',
+                bottom: '页底横幅广告位 · 970 × 90'
+            }
+        };
+
+        let adSenseLoaderPromise = null;
+
+        function ensureAdSenseLoader(client) {
+            if (adSenseLoaderPromise) return adSenseLoaderPromise;
+            adSenseLoaderPromise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.async = true;
+                script.crossOrigin = 'anonymous';
+                script.dataset.adsenseLoader = 'true';
+                script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(client);
+                script.onload = () => resolve();
+                script.onerror = () => {
+                    adSenseLoaderPromise = null;
+                    reject(new Error('AdSense loader failed'));
+                };
+                document.head.appendChild(script);
+            });
+            return adSenseLoaderPromise;
+        }
+
+        function renderAdPlaceholder(container, position, note) {
+            container.classList.remove('is-live');
+            container.replaceChildren();
+            const placeholder = document.createElement('div');
+            placeholder.className = 'ad-placeholder';
+
+            const tag = document.createElement('span');
+            tag.className = 'ad-placeholder-tag';
+            tag.textContent = '广告位预览';
+
+            const label = document.createElement('span');
+            label.textContent = AD_CONFIG.labels[position] || '广告位';
+
+            const hint = document.createElement('span');
+            hint.className = 'ad-placeholder-note';
+            hint.textContent = note || '配置 AdSense 或自定义广告代码后自动替换';
+
+            placeholder.append(tag, label, hint);
+            container.appendChild(placeholder);
+        }
+
+        function renderAdSense(container, client, slotId, position) {
+            container.classList.add('is-live');
+            container.replaceChildren();
+
+            const label = document.createElement('div');
+            label.className = 'ad-slot-label';
+            label.textContent = '广告';
+
+            const ad = document.createElement('ins');
+            ad.className = 'adsbygoogle';
+            ad.style.display = 'block';
+            ad.setAttribute('data-ad-client', client);
+            ad.setAttribute('data-ad-slot', slotId);
+            ad.setAttribute('data-ad-format', 'auto');
+            ad.setAttribute('data-full-width-responsive', 'true');
+
+            container.append(label, ad);
+            ensureAdSenseLoader(client)
+                .then(() => {
+                    (window.adsbygoogle = window.adsbygoogle || []).push({});
+                })
+                .catch(() => {
+                    renderAdPlaceholder(container, position, 'AdSense 脚本加载失败，请检查网络或广告拦截器');
+                });
+        }
+
+        function mountCustomAd(container, html) {
+            container.classList.add('is-live');
+            container.replaceChildren();
+            container.insertAdjacentHTML('beforeend', html);
+
+            // innerHTML 不会执行 script，重新创建一遍以兼容百度联盟等广告代码。
+            container.querySelectorAll('script').forEach((oldScript) => {
+                const script = document.createElement('script');
+                Array.from(oldScript.attributes).forEach((attr) => script.setAttribute(attr.name, attr.value));
+                script.text = oldScript.text;
+                oldScript.replaceWith(script);
+            });
+        }
+
+        function renderAdSlot(position) {
+            const container = document.querySelector(`[data-ad-position="${position}"]`);
+            if (!container) return;
+
+            if (!AD_CONFIG.enabled) {
+                container.hidden = true;
+                container.replaceChildren();
+                return;
+            }
+            container.hidden = false;
+
+            const client = (AD_CONFIG.adsense.client || '').trim();
+            const slotId = (AD_CONFIG.adsense.slots[position] || '').trim();
+            const customHtml = (AD_CONFIG.customHtml[position] || '').trim();
+
+            if (AD_CONFIG.provider === 'adsense' && client && slotId) {
+                renderAdSense(container, client, slotId, position);
+                return;
+            }
+            if (AD_CONFIG.provider === 'custom' && customHtml) {
+                mountCustomAd(container, customHtml);
+                return;
+            }
+            if (AD_CONFIG.showPlaceholders) {
+                renderAdPlaceholder(container, position);
+            } else {
+                container.hidden = true;
+                container.replaceChildren();
+            }
+        }
+
+        function initAdSlots() {
+            ['top', 'inFeed', 'bottom'].forEach(renderAdSlot);
+        }
 
         // ===== AI 服务配置 =====
         const DEFAULT_SYSTEM_PROMPT = '你是一个专业的AI助手，回答准确简洁，严格按照用户要求输出。';
@@ -1121,6 +1346,7 @@
 
         syncFormFromActiveService();
         updateProviderUI();
+        initAdSlots();
         if (!(getActiveService().key || '').trim()) {
             showSettingsMessage('首次使用：选择 AI 服务、填写 Key，然后保存。Key 只保存在当前浏览器。');
         }
