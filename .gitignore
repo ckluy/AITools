@@ -1,0 +1,11 @@
+.idea/
+__pycache__/
+.check-inline.js
+.test_cdp.py
+.test_shot.py
+page.png
+settings.png
+.edge-profile/
+.edge-profile-2/
+.edge-cdp/
+
